@@ -18,6 +18,7 @@ class GetFeatures:
         self.nps = []
         self.time_at_gl = []
         self.log_gl_15 = []
+        self.offsets = []
 
         self.gl = np.nan
 
@@ -79,6 +80,18 @@ class GetFeatures:
             elif i in log_offsets:
                 log = 0
             self.ground_truths.append(log)
+
+        log = 0
+        for i in range(len(self.input_data_0)):
+            # Keep track if trial is active by log files
+            if i in log_onsets:
+                log = 0
+            elif i+7 in log_offsets:
+                log = 1
+            elif i-7 in log_offsets:
+                log = 0
+
+            self.offsets.append(log)
 
         node_0 = self.input_data_0[:, 5].astype('uint8')
         node_1 = self.input_data_1[:, 5].astype('uint8')
@@ -147,11 +160,11 @@ class GetFeatures:
     def build_features_log(self):
 
         output_data = open(self.output_filepath, 'w')
-        output_data.write('Frame number, ground truth, mouse presence, nodes per second, time at gl, time at gl >=15\n')
+        output_data.write('Frame number, offsets, mouse presence, nodes per second, time at gl, time at gl >=15\n')
 
         for i in range(len(self.input_data_0)):
 
-            output_data.write('{}, {}, {}, {}, {}, {}\n'.format(i, self.ground_truths[i], self.mouse_presence[i], self.nps[i], self.time_at_gl[i], self.log_gl_15[i]))
+            output_data.write('{}, {}, {}, {}, {}, {}\n'.format(i, self.offsets[i], self.mouse_presence[i], self.nps[i], self.time_at_gl[i], self.log_gl_15[i]))
 
         output_data.close()
 
@@ -171,4 +184,4 @@ if __name__ == '__main__':
     G.mouse_in()
     G.nodes_per_second()
     G.at_gl_s()
-    # G.build_features_log()
+    G.build_features_log()

@@ -1,4 +1,7 @@
 import numpy as np
+import pkg_resources
+from pathlib import Path
+import os
 
 
 class GetFeatures:
@@ -9,7 +12,6 @@ class GetFeatures:
         self.log_path = input_filepaths[2]
 
         self.vid_0_path = input_filepaths[3]
-        self.vid_1_path = input_filepaths[4]
 
         self.output_filepath = output_filepath
 
@@ -21,9 +23,10 @@ class GetFeatures:
 
         self.gl = np.nan
 
-    def ground_truth(self):
-        vid_t = (3600 * int(self.vid_0_path[63:65]) + 60 * int(self.vid_0_path[66:68]) + int(self.vid_0_path[69:71])) * 15
+        self.offsets = []
 
+    def ground_truth(self):
+        vid_t = (3600 * int(self.vid_0_path[len(self.vid_0_path)-8:len(self.vid_0_path)-6]) + 60 * int(self.vid_0_path[len(self.vid_0_path)-5:len(self.vid_0_path)-3]) + int(self.vid_0_path[len(self.vid_0_path)-2:])) * 15
         act = []
         act_line = ["Trial ++++++++ active ++++++++"]
 
@@ -51,7 +54,7 @@ class GetFeatures:
         counts = np.bincount(gl)
         gls = np.where(counts >= 5)[0]
 
-        log_onsets, log_offsets = [], []
+        self.log_onsets, self.log_offsets = [], []
 
         for i in range(len(act)):
             on_t = (3600 * int(act[i][11:13]) + 60 * int(act[i][14:16]) + int(act[i][17:19])) * 15 - vid_t
@@ -62,23 +65,25 @@ class GetFeatures:
                 on_tf = on_tf[0][0]
             else:
                 on_tf = np.nan
-            log_onsets.append(on_tf)
+            self.log_onsets.append(on_tf)
 
             off_tf = np.argwhere(self.input_data_1 == off_t)
             if off_t in self.input_data_1:
                 off_tf = off_tf[0][0]
             else:
                 off_tf = np.nan
-            log_offsets.append(off_tf)
+            self.log_offsets.append(off_tf)
 
         log = 0
         for i in range(len(self.input_data_0)):
             # Keep track if trial is active by log files
-            if i in log_onsets:
-                log = 1
-            elif i in log_offsets:
+            if i in self.log_onsets:
                 log = 0
-            self.ground_truths.append(log)
+            elif i+7 in self.log_offsets:
+                log = 1
+            elif i-7 in self.log_offsets:
+                log = 0
+            self.offsets.append(log)
 
         node_0 = self.input_data_0[:, 5].astype('uint8')
         node_1 = self.input_data_1[:, 5].astype('uint8')
@@ -94,7 +99,6 @@ class GetFeatures:
             gl_counts.append(counts[val])
 
         self.gl = str(gls[np.argmax(gl_counts)]) + '.0'
-
 
     def mouse_in(self):
 
@@ -124,6 +128,10 @@ class GetFeatures:
                 nodes_per_s = np.count_nonzero(diff0) + np.count_nonzero(diff1)
             self.nps.append(nodes_per_s)
 
+    def find_gl(self):
+        with open(self.log_path) as f:
+            pass
+
     def at_gl_s(self):
         gl = self.gl
         gl_f = 0
@@ -151,24 +159,56 @@ class GetFeatures:
 
         for i in range(len(self.input_data_0)):
 
-            output_data.write('{}, {}, {}, {}, {}, {}\n'.format(i, self.ground_truths[i], self.mouse_presence[i], self.nps[i], self.time_at_gl[i], self.log_gl_15[i]))
+            output_data.write('{}, {}, {}, {}, {}, {}\n'.format(i, self.offsets[i], self.mouse_presence[i], self.nps[i], self.time_at_gl[i], self.log_gl_15[i]))
 
         output_data.close()
 
 
+class Stitch_Those_Files:
+
+    def __init__(self):
+        outdir = "{}/data/interim/features_stitched/features.csv".format(os.getcwd())
+        self.features_log = open(outdir, 'w')
+        self.features_log.write('Frame number, ground truth, mouse presence, nodes per second, time at gl, time at gl >=15\n')
+
+    def stitch_those_files(self):
+
+        rootdir = "{}/data/interim/features".format(os.getcwd())
+
+        for subdir, dirs, files in os.walk(rootdir):
+            for file in files:
+                root = os.path.join(rootdir, file)
+                data = np.genfromtxt(root, delimiter=',', skip_header=True)
+
+                for i in range(len(data)):
+                    self.features_log.write(
+                        '{}, {}, {}, {}, {}, {}\n'.format(data[i,0], data[i,1], data[i,2], data[i,3],
+                                                          data[i, 4], data[i,5]))
+
+        self.features_log.close()
+
+
 if __name__ == '__main__':
-    path_0 = r"C:/Users/Gebruiker/Documents/HexClassifier/data/raw/2019-01-15_16-41-48/pos_log_file_lin_0.csv"
-    path_1 = r"C:/Users/Gebruiker/Documents/HexClassifier/data/raw/2019-01-15_16-41-48/pos_log_file_lin_1.csv"
-    path_log = r"C:/Users/Gebruiker/Documents/HexClassifier/data/raw/2019-01-15_15-17-16/2019-01-15_15-16-47_hextrack_log"
-    vid_0_path = r'C:/Users/Gebruiker/Documents/HexClassifier/data/raw/2019-01-15_15-17-16/2019-05-07_14-53-54_cam_0.avi'
-    vid_1_path = r'C:/Users/Gebruiker/Documents/HexClassifier/data/raw/2019-01-15_15-17-16/2019-05-07_14-53-54_cam_1.avi'
+    rootdir = "{}/data/raw".format(os.getcwd())
 
-    input_paths = [path_0, path_1, path_log, vid_0_path, vid_1_path]
-    output_path = r"C:/Users/Gebruiker/Documents/HexClassifier/data/processed/features.csv"
+    for subdir, dirs, files in os.walk(rootdir):
+        for dir in dirs:
+            for s, d, f in os.walk(os.path.join(subdir, dir)):
+                path_log = os.path.join(rootdir, dir, f[0])
+                pos_0_log = os.path.join(rootdir, dir, f[1])
+                pos_1_log = os.path.join(rootdir, dir, f[2])
+                start_track = os.path.join(rootdir, dir)
 
-    G = GetFeatures(input_paths, output_path)
-    G.ground_truth()
-    G.mouse_in()
-    G.nodes_per_second()
-    G.at_gl_s()
-    # G.build_features_log()
+                input_paths = [pos_0_log, pos_1_log, path_log, start_track]
+
+                output_path = "{}/data/interim/features/features_{}.csv".format(os.getcwd(), dir)
+
+                G = GetFeatures(input_paths, output_path)
+                G.ground_truth()
+                G.mouse_in()
+                G.nodes_per_second()
+                G.at_gl_s()
+                G.build_features_log()
+
+    S = Stitch_Those_Files()
+    S.stitch_those_files()

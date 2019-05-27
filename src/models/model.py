@@ -14,7 +14,7 @@ class Models:
         self.data = np.genfromtxt(input_filepath, delimiter=',', skip_header=True)
 
     def preprocessing(self):
-        features = self.df.iloc[:, 2:].values
+        features = self.df.iloc[:, 2:4].values
         ground_truth= self.df.iloc[:, 1].values
         scaler = StandardScaler()
         features = scaler.fit_transform(features)
@@ -36,19 +36,29 @@ class Models:
         print(classification_report(self.test_labels, pred))
         print(accuracy_score(self.test_labels, pred))
 
-    def quickresult(self):
-        testlog = open(r"C:/Users/Gebruiker/Documents/HexClassifier/data/processed/testlog.csv", 'w')
+    def quickresult_GaussianNB(self):
+        testlog = open(r"C:/Users/Gebruiker/Documents/HexClassifier/data/processed/testlog_Gauss.csv", 'w')
 
-        pred = self.sg.predict(self.df.iloc[:, 2:].values)
+        pred = self.gnb.predict(self.df.iloc[:, 2:4].values)
+        for i in range(len(self.data)):
+            testlog.write('{}, {}, {}\n'.format(i, self.data[i, 1], pred[i]))
+        testlog.close()
+
+    def quickresult_SGD(self):
+        testlog = open(r"C:/Users/Gebruiker/Documents/HexClassifier/data/processed/testlog_SGD.csv", 'w')
+
+        pred = self.sg.predict(self.df.iloc[:, 2:4].values)
         for i in range(len(self.data)):
             testlog.write('{}, {}, {}\n'.format(i, self.data[i, 1], pred[i]))
         testlog.close()
 
 
 if __name__ == '__main__':
-    input_path = r"C:/Users/Gebruiker/Documents/HexClassifier/data/processed/features.csv"
+    input_path = r"C:/Users/Gebruiker/Documents/HexClassifier/data/interim/features_stitched/features.csv"
 
     M = Models(input_path)
     M.preprocessing()
+    M.GaussianNB()
+    M.quickresult_GaussianNB()
     M.SGDClassifier()
-    M.quickresult()
+    M.quickresult_SGD()
